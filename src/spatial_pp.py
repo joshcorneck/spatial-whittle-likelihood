@@ -37,7 +37,7 @@ class SPP_HomPoisson(SPP):
     """
     def __init__(self, minX=0, maxX=1, minY=0, maxY=1):
         self.minX = minX; self.maxX = maxX 
-        self.minY = minY; self.maxY = maxY
+        self.minY = minY; self.maxY = maxY 
 
         # Compute parameters of the simulation window
         self.lenX = maxX - minX; self.lenY = maxY - minY
@@ -203,5 +203,6 @@ class SPP_Thomas(SPP_HomPoisson):
 
 #%%
 tom = SPP_Thomas()
-tom.sample_and_plot(50, 25, 0.03, np.array([[0.8,0.5], [0.5, 0.8]]), 1.25)
-# %%
+len(tom.simSPP(25, 15, 0.03, np.array([[1,0], [0, 1]]), 1.25))
+#%%
+tom.sample_and_plot(25, 15, 0.03, np.array([[1,0], [0, 1]]), 1.25)
