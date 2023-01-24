@@ -8,9 +8,6 @@ from mpl_toolkits import mplot3d
 
 from abc import ABC, abstractmethod, abstractstaticmethod
 
-# from periodogram import 
-
-
 class SPP(ABC):
     """
     Abstract base class for spatial point processes
@@ -73,9 +70,13 @@ class SPP_HomPoisson(SPP):
         self.plot(self.homPattern[:,0], self.homPattern[:,1])
 
     @staticmethod
-    def plot(x, y):
+    def plot(x, y, save, file_name):
         plt.scatter(x, y, edgecolor='b', alpha=0.5)
         plt.xlabel("x"); plt.ylabel("y")
+        if save:
+            if file_name == None:
+                raise ValueError("Please give a file name.")
+            plt.savefig(file_name)
 
 
 
@@ -132,12 +133,13 @@ class SPP_InhomPoisson(SPP_HomPoisson):
         # Form resulting inhomogeneous process
         return homPattern[retainBool,:]
 
-    def sample_and_plot(self, lambdaInhom):
+    def sample_and_plot(self, lambdaInhom, file_name, save=False):
         """
         Function to sample and plot the result.
         """
         self.inhomPattern = self.simSPP(lambdaInhom)
-        self.plot(self.inhomPattern[:,0], self.inhomPattern[:,1])
+        self.plot(self.inhomPattern[:,0], self.inhomPattern[:,1],
+                  save, file_name)
 
 
 class SPP_Thomas(SPP_HomPoisson):
@@ -149,16 +151,16 @@ class SPP_Thomas(SPP_HomPoisson):
     def __init__(self, minX=0, maxX=1, minY=0, maxY=1):
         super().__init__(minX, maxX, minY, maxY)
 
-    def simSPP(self, kappa, alpha, sigma, cov, enlarge) -> np.array:
+    def simSPP(self, rho, K, sigma, cov, enlarge) -> np.array:
         """
         Simulate a realisation of a Thomas point process. We can do this
-        by simulating a homogeneous poisson process with intensity kappa,
+        by simulating a homogeneous poisson process with intensity rho,
         and then simulating the number of children of each cluster as
-        coming from Poisson(alpha) and simulating their locations using
+        coming from Poisson(K) and simulating their locations using
         a Gaussian kernel with covaraince sigma^2I. Parameters:
 
-        - kappa: parent intensity.
-        - alpha: intensity of Poisson distribution for number of offspring.
+        - rho: parent intensity.
+        - K: intensity of Poisson distribution for number of offspring.
         - sigma: sd along diagonal of covariance matrix.
         - cov: the covariance matrix for the normal distribution. 
         - enlarge: scale factor to give grid to sim on to correct
@@ -166,14 +168,14 @@ class SPP_Thomas(SPP_HomPoisson):
         """
         # Simulate the parents (this is done on a larger grid than given
         # to account for edge effects)
-        homPattern = super().simSPP(kappa, enlarge)
+        homPattern = super().simSPP(rho, enlarge)
         self.homPattern = homPattern
         # Iterate over each parent and simulate offspring using a 2d
         # Gaussian kernel
         numParents = len(homPattern)
         offspring = []
         for i in range(numParents):
-            numOffspring = np.random.poisson(lam=alpha, size=1)[0]
+            numOffspring = np.random.poisson(lam=K, size=1)[0]
             sampOffspring = np.random.multivariate_normal(
                 mean=homPattern[i,:],
                 cov=sigma**2 * cov,
@@ -194,15 +196,18 @@ class SPP_Thomas(SPP_HomPoisson):
 
         return offspring[inside,:]
 
-    def sample_and_plot(self, kappa, alpha, sigma, cov, enlarge):
+    def sample_and_plot(self, rho, K, sigma, cov, enlarge, file_name=None,
+                        save=False):
         """
         Function to sample a homogeneous PP and to plot the result.
         """
-        thomasSPP = self.simSPP(kappa, alpha, sigma, cov, enlarge)
-        self.plot(thomasSPP[:,0], thomasSPP[:,1])
+        thomasSPP = self.simSPP(rho, K, sigma, cov, enlarge)
+        self.plot(thomasSPP[:,0], thomasSPP[:,1], save, file_name)
 
 #%%
 tom = SPP_Thomas()
-len(tom.simSPP(25, 15, 0.03, np.array([[1,0], [0, 1]]), 1.25))
-#%%
-tom.sample_and_plot(25, 15, 0.03, np.array([[1,0], [0, 1]]), 1.25)
+tom.sample_and_plot(rho=25, K=20, sigma=0.03, cov=np.array([[1,0], [0, 1]]), 
+                    enlarge=1.25, file_name="Plots/Thomas_sample_K_100.pdf", 
+                    save=False)
+
+# %%
