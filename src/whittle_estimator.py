@@ -56,10 +56,10 @@ class BaseWhittleEstimator(Periodogram, ABC):
         likelihood_eval = np.zeros((len(self.fourier_frequencies) ** 2))
 
         i = -1; k=-1
-        for p in self.fourier_frequencies:
+        for p in self.freq_set:
             i += 1
             j = -1
-            for q in self.fourier_frequencies:
+            for q in self.freq_set:
                 j += 1; k += 1
                 spectral_density = self.computeSpectralDensity(
                     p=p, q=q, **kwargs)
@@ -87,8 +87,6 @@ class BaseWhittleEstimator(Periodogram, ABC):
 
         return solution.x
 
-
-
 class ThomasWhittleEstimator(BaseWhittleEstimator):
     """
     A class to compute an estimator based on the Whittle likelihood.
@@ -112,7 +110,7 @@ class ThomasWhittleEstimator(BaseWhittleEstimator):
         Function to compute the spectral density estimate for a Thomas
         process.
         """
-        return rho * K * (1 + K * np.exp(-(p ** 2 + q ** 2) * (sigma ** 2)))
+        return rho * K * (1 + K * np.exp(-4 * np.pi**2 * (p ** 2 + q ** 2) * (sigma ** 2)))
 
     # def gradient(self, rho, K, sigma):
     #     """

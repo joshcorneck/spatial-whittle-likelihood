@@ -36,7 +36,7 @@ class Periodogram:
         self.freq_min = freq_min; self.freq_max = freq_max
 
         # Define the set of frequencies where we want to evaluate the periodogram
-        self.freq_set = np.arange(freq_min, freq_max + 1, freq_step)
+        self.freq_set = np.arange(freq_min, freq_max, freq_step)
 
     def taper_default(self):
         """
@@ -84,15 +84,15 @@ class Periodogram:
             # Scale x-y values by 2pi and by p or q: do p on the 
             # outside of the q loop so it's done once
             spp_freq = self.spp.copy()
-            spp_freq[:,0] = self.spp[:,0] * 2*np.pi*p
+            spp_freq[:,0] = self.spp[:,0] * (-2*np.pi*p)
             q_count = -1
             for q in self.freq_set:
                 q_count += 1
                 # Scale by 2pi and q
-                spp_freq[:,1] = self.spp[:,1] * 2*np.pi*q
+                spp_freq[:,1] = self.spp[:,1] * (-2*np.pi*q)
 
                 # Create array from summing these values (input into trig) - this is
-                # 2pi * omega . x
+                # -2pi * omega . x
                 spp_freq_sum = spp_freq[:,0] + spp_freq[:,1]
 
                 # Input the scaled sum into the trig functions, multiply each by the
@@ -136,6 +136,8 @@ class Periodogram:
         sample_periodograms = []
 
         for n in range(n_spp):
+            if n % 50 == 0:
+                print(f"Iteration: {n+1}")
             spp = spps[n]
             self.computeSinglePeriodogram(spp)
             sample_periodograms.append(self.periodogram)
@@ -163,17 +165,21 @@ class Periodogram:
             plt.imshow(self.average_periodogram, 
                     interpolation='nearest', 
                     cmap=plt.cm.viridis, 
-                    extent=[self.freq_min,
-                            self.freq_max,
-                            self.freq_min,
-                            self.freq_max])
+                    extent=[self.freq_set[0],
+                            self.freq_set[-1],
+                            self.freq_set[0],
+                            self.freq_set[-1]])
+            plt.xlabel(r"$\omega_1$"); plt.ylabel(r"$\omega_2$")
             plt.colorbar()
+            plt.savefig("Plots/Periodogram/thomas_avg_periodogram.pdf")
             plt.show()
+
         else:
             # Plot the process realisation
             plt.scatter(self.spp[:,0], self.spp[:,1], 
                         edgecolor='b', alpha=0.5)
             plt.xlabel("x"); plt.ylabel("y")
+            plt.savefig("Plots/Sample Patterns/thomas_spp.pdf")
             plt.show()
             plt.clf()
 
@@ -181,32 +187,73 @@ class Periodogram:
             plt.imshow(self.periodogram, 
                     interpolation='nearest', 
                     cmap=plt.cm.viridis, 
-                    extent=[self.freq_min,
-                            self.freq_max,
-                            self.freq_min,
-                            self.freq_max])
+                    extent=[self.freq_set[0],
+                            self.freq_set[-1],
+                            self.freq_set[0],
+                            self.freq_set[-1]])
+            plt.xlabel(r"$\omega_1$"); plt.ylabel(r"$\omega_2$")
             plt.colorbar()
+            plt.savefig("Plots/Periodogram/thomas_taper_single_periodogram.pdf")
             plt.show()
 
-#%% 
-from spatial_pp import SPP_HomPoisson, SPP_Thomas
-#%%
-per = Periodogram(thom, -10, 10, 1)
-per.averagePeriodogram(n_samp = 1000, kappa=50, alpha=25, sigma=0.03, 
-                       cov=np.array([[1,0], [0, 1]]), enlarge=1.25)
-per.plot()
-#%%
-tom = SPP_Thomas()
-spp = tom.simSPP(50, 25, 0.01, np.array([[1, 0], [0, 1]]), enlarge=1.25)
+def orthog_sine_taper(x):
+    return (np.sin(np.pi * (x[:,0] + 1/2)) *
+            np.sin(np.pi * (x[:,1] + 1/2)))
 
-per = Periodogram(-16, 16, 1)
-per.computeSinglePeriodogram(spp)
-#%%
-spps = []
-for j in range(1000):
-    spps.append(tom.simSPP(50, 25, 0.01, np.array([[1, 0], [0, 1]]), enlarge=1.25))
+def orthog_sine_taper_ft(p, q):
+    outer = -16 * p * q * np.cos(np.pi * p) * np.cos(np.pi * q)/(np.pi**2 * (4 * p ** 2 - 1) * (4 * q ** 2 - 1))
+    inner = np.array([np.cos(np.pi * (p + q)), -np.sin(np.pi * (p + q))])
+    return outer * inner
+
 
 #%%
-per = Periodogram(-16, 16, 1)
-per.computeAveragePeriodogram(spps)
-#%%
+# from spatial_pp import SPP_HomPoisson, SPP_Thomas
+# #%%
+# tom = SPP_Thomas()
+# spps = []
+# for i in range(1000):
+#     spps.append(tom.simSPP(50, 25, 0.02, np.array([[1, 0], [0, 1]]), enlarge=1.25))
+
+# per = Periodogram(-16, 16, 1)
+# per.computeAveragePeriodogram(spps)
+# per.plot(average=True)
+# per.computeSinglePeriodogram(spps[0])
+# per.plot(average=False)
+
+# #%%
+# pois = SPP_HomPoisson()
+
+# pois_spps = []
+# for i in range(1000):
+#     pois_spps.append(pois.simSPP(500))
+# #%%
+# per = Periodogram(-16, 16, 1)
+# per.computeAveragePeriodogram(spps)
+# per.plot(average=True)
+# # %%
+# # Thomas theoretical 
+# def thomas_theo(rho, K, sigma, p, q):
+#     return rho * K * (1 + K * np.exp(-(p ** 2 + q ** 2) * (sigma ** 2)))
+
+# freq_set = np.arange(-16, 16, 1) * 2 * np.pi
+
+# I_theo = np.zeros((len(freq_set), len(freq_set)))
+
+# i = -1
+# for p in freq_set:
+#     i += 1
+#     j = 0
+#     for q in freq_set:
+#         I_theo[i, j] = thomas_theo(50, 25, 0.02, p, q)
+#         j += 1
+
+# plt.imshow(I_theo, 
+#         interpolation='nearest', 
+#         cmap=plt.cm.viridis, 
+#         extent=[freq_set[0],
+#                 freq_set[-1],
+#                 freq_set[0],
+#                 freq_set[-1]])
+# plt.xlabel(r"$\omega_1$"); plt.ylabel(r"$\omega_2$")
+# plt.colorbar()
+# plt.show()

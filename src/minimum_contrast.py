@@ -88,30 +88,30 @@ class MinimumContrastThomas:
 
 #%%
 
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
-# Run 100 iterations of minimum contrast and plot diagnostics
-params = np.zeros((100, 2))
-for j in range(100):
-    if j / 10 == np.floor(j / 10):
-        print(j)
-    spp_t = SPP_Thomas()
-    mct = MinimumContrastThomas(spp_t, kappa=25, alpha=15, sigma=0.03, 
-                                cov = np.array([[1,0], [0, 1]]), enlarge=1.25)
-    samp_params = mct.minimumContrastEstimate()
-    params[j,:] = samp_params[[0,2]]
-#%%
+# # Run 100 iterations of minimum contrast and plot diagnostics
+# params = np.zeros((100, 2))
+# for j in range(100):
+#     if j / 10 == np.floor(j / 10):
+#         print(j)
+#     spp_t = SPP_Thomas()
+#     mct = MinimumContrastThomas(spp_t, kappa=25, alpha=15, sigma=0.03, 
+#                                 cov = np.array([[1,0], [0, 1]]), enlarge=1.25)
+#     samp_params = mct.minimumContrastEstimate()
+#     params[j,:] = samp_params[[0,2]]
+# #%%
 
-plt.figure(1);
-plt.scatter(np.log(params[:,0]), np.log(params[:,1]));
-plt.xlabel(r"$\log(\hat{\kappa})$"); plt.ylabel(r"$\log(\hat{\sigma})$");
+# plt.figure(1);
+# plt.scatter(np.log(params[:,0]), np.log(params[:,1]));
+# plt.xlabel(r"$\log(\hat{\kappa})$"); plt.ylabel(r"$\log(\hat{\sigma})$");
 
-data = [(params[:,0]- 25)/25, (params[:,1]- 0.03)/0.03]
-fig7, ax7 = plt.subplots()
-ax7.set_title('Normalised differnece between parameter estimates and true values')
-ax7.boxplot(data)
-plt.xticks([1, 2], [r'$(\hat{\kappa} - \kappa)/\kappa$', r'$(\hat{\sigma} - \sigma)/\sigma$'])
-plt.show()
+# data = [(params[:,0]- 25)/25, (params[:,1]- 0.03)/0.03]
+# fig7, ax7 = plt.subplots()
+# ax7.set_title('Normalised differnece between parameter estimates and true values')
+# ax7.boxplot(data)
+# plt.xticks([1, 2], [r'$(\hat{\kappa} - \kappa)/\kappa$', r'$(\hat{\sigma} - \sigma)/\sigma$'])
+# plt.show()
 
 # plt.figure(2);
 # plt.boxplot((params[:,0]- 25)/25);

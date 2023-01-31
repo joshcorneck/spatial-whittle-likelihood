@@ -62,12 +62,12 @@ class SPP_HomPoisson(SPP):
 
         return np.array([xHom, yHom]).reshape((len(xHom), 2))
 
-    def sample_and_plot(self, lambdaHom):
+    def sample_and_plot(self, lambdaHom, file_name='', save=False):
         """
         Function to sample a homogeneous PP and to plot the result.
         """
         self.homPattern = self.simSPP(lambdaHom)
-        self.plot(self.homPattern[:,0], self.homPattern[:,1])
+        self.plot(self.homPattern[:,0], self.homPattern[:,1], save, file_name)
 
     @staticmethod
     def plot(x, y, save, file_name):
@@ -133,7 +133,7 @@ class SPP_InhomPoisson(SPP_HomPoisson):
         # Form resulting inhomogeneous process
         return homPattern[retainBool,:]
 
-    def sample_and_plot(self, lambdaInhom, file_name, save=False):
+    def sample_and_plot(self, lambdaInhom, file_name='', save=False):
         """
         Function to sample and plot the result.
         """
@@ -204,10 +204,10 @@ class SPP_Thomas(SPP_HomPoisson):
         thomasSPP = self.simSPP(rho, K, sigma, cov, enlarge)
         self.plot(thomasSPP[:,0], thomasSPP[:,1], save, file_name)
 
-#%%
-tom = SPP_Thomas()
-tom.sample_and_plot(rho=25, K=20, sigma=0.03, cov=np.array([[1,0], [0, 1]]), 
-                    enlarge=1.25, file_name="Plots/Thomas_sample_K_100.pdf", 
-                    save=False)
+# #%%
+# tom = SPP_Thomas()
+# tom.sample_and_plot(rho=25, K=20, sigma=0.03, cov=np.array([[1,0], [0, 1]]), 
+#                     enlarge=1.25, file_name="Plots/Thomas_sample_K_100.pdf", 
+#                     save=False)
 
 # %%
