@@ -15,8 +15,8 @@ class Periodogram:
              is computed.
     - taper_ft: Fourier transform of the taper. Default as above.
     """
-    def __init__(self, freq_min, freq_max, freq_step, minX=0, maxX=1, 
-                 minY=0, maxY=1, taper=None, taper_ft=None):
+    def __init__(self, freq_min, freq_max, freq_step, minX=-1/2, maxX=1/2, 
+                 minY=-1/2, maxY=1/2, taper=None, taper_ft=None):
 
         self.minX = minX; self.maxX = maxX; self.minY = minY;  self.maxY = maxY
         self.ell_x = maxX - minX; self.ell_y = maxY - minY
@@ -130,7 +130,7 @@ class Periodogram:
 
         self.periodogram = periodogram
 
-    def computeAveragePeriodogram(self, spps):
+    def computeAveragePeriodogram(self, spps, verbose=100):
         """
         Run n_samp simulations and compute periodogram for each, then average.
         Parameters:
@@ -141,9 +141,10 @@ class Periodogram:
 
         sample_periodograms = []
 
+        print("Computing periodograms...")
         for n in range(n_spp):
-            if n % 1 == 0:
-                print(f"Iteration: {n+1}")
+            if n % verbose == 0:
+                print(f"Iteration: {n+1} of {n_spp}")
             spp = spps[n]
             self.computeSinglePeriodogram(spp)
             sample_periodograms.append(self.periodogram)
@@ -177,7 +178,7 @@ class Periodogram:
                             self.freq_set[-1]])
             plt.xlabel(r"$\omega_1$"); plt.ylabel(r"$\omega_2$")
             plt.colorbar()
-            plt.savefig("Plots/Periodogram/thomas_avg_periodogram.pdf")
+            # plt.savefig("Plots/Periodogram/thomas_avg_periodogram.pdf")
             plt.show()
 
         else:
@@ -185,7 +186,7 @@ class Periodogram:
             plt.scatter(self.spp[:,0], self.spp[:,1], 
                         edgecolor='b', alpha=0.5)
             plt.xlabel("x"); plt.ylabel("y")
-            plt.savefig("Plots/Sample Patterns/thomas_spp.pdf")
+            # plt.savefig("Plots/Sample Patterns/thomas_spp.pdf")
             plt.show()
             plt.clf()
 
@@ -199,7 +200,7 @@ class Periodogram:
                             self.freq_set[-1]])
             plt.xlabel(r"$\omega_1$"); plt.ylabel(r"$\omega_2$")
             plt.colorbar()
-            plt.savefig("Plots/Periodogram/thomas_taper_single_periodogram.pdf")
+            # plt.savefig("Plots/Periodogram/thomas_taper_single_periodogram.pdf")
             plt.show()
 
 def orthog_sine_taper(x):

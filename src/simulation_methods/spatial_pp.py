@@ -39,7 +39,7 @@ class SPP_HomPoisson(SPP):
 
     - minX, maxX, minY, maxY: end coordinates of the simulation window
     """
-    def __init__(self, minX=0, maxX=1, minY=0, maxY=1):
+    def __init__(self, minX=-1/2, maxX=1/2, minY=-1/2, maxY=1/2):
         self.minX = minX; self.maxX = maxX 
         self.minY = minY; self.maxY = maxY 
 
@@ -95,7 +95,7 @@ class SPP_InhomPoisson(SPP_HomPoisson):
 
     - minX, maxX, minY, maxY: end coordinates of the simulation window
     """
-    def __init__(self, minX=0, maxX=1, minY=0, maxY=1):
+    def __init__(self, minX=-1/2, maxX=1/2, minY=-1/2, maxY=1/2):
         super().__init__(minX, maxX, minY, maxY)
 
     def simSPP(self, lambdaInhom) -> np.array:
@@ -156,7 +156,7 @@ class SPP_Thomas(SPP_HomPoisson):
 
     - minX, maxX, minY, maxY: end coordinates of the simulation window
     """
-    def __init__(self, minX=0, maxX=1, minY=0, maxY=1):
+    def __init__(self, minX=-1/2, maxX=1/2, minY=-1/2, maxY=1/2):
         super().__init__(minX, maxX, minY, maxY)
 
     def simSPP(self, rho, K, sigma, cov, enlarge) -> np.array:
@@ -221,7 +221,7 @@ class SPP_LGCP(SPP):
     - minX, maxX, minY, maxY: end coordinates of the simulation window.
     - step_size: lattice point spacing
     """
-    def __init__(self, step_size, minX=0, maxX=1, minY=0, maxY=1):
+    def __init__(self, step_size, minX=-1/2, maxX=1/2, minY=-1/2, maxY=1/2):
         self.minX = minX; self.maxX = maxX 
         self.minY = minY; self.maxY = maxY
         self.step_size = step_size

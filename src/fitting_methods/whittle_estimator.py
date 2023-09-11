@@ -1,8 +1,11 @@
+#%%
 import numpy as np
 import scipy, time
 from scipy.optimize import minimize
 from abc import ABC, abstractmethod, abstractstaticmethod
 from typing import List, Union
+import mpmath as mp
+import math
 
 from spatial_pp import SPP_Thomas
 from periodogram import Periodogram
@@ -20,8 +23,9 @@ class BaseWhittleEstimator(Periodogram, ABC):
              is computed.
         - taper_ft: Fourier transform of the taper. Default as above.
     """
-    def __init__(self, spp, freq_min=-16, freq_max=16, freq_step=1,
-                 minX=0, maxX=1, minY=0, maxY=1, taper=None, taper_ft=None):
+    def __init__(self, spp, freq_min, freq_max, freq_step,
+                 minX, maxX, minY, maxY, taper=None, 
+                 taper_ft=None):
         super().__init__(freq_min, freq_max, freq_step, minX, maxX, 
                          minY, maxY, taper, taper_ft)
         self.spp = spp
@@ -100,8 +104,8 @@ class ThomasWhittleEstimator(BaseWhittleEstimator):
              is computed.
         - taper_ft: Fourier transform of the taper. Default as above.
     """
-    def __init__(self, spp, freq_min=-16, freq_max=16, freq_step=1,
-                 minX=0, maxX=1, minY=0, maxY=1, taper=None, taper_ft=None):
+    def __init__(self, spp, freq_min, freq_max, freq_step,
+                 minX, maxX, minY, maxY, taper=None, taper_ft=None):
         super().__init__(spp, freq_min, freq_max, freq_step,minX, maxX, 
                          minY, maxY, taper, taper_ft)
 
@@ -112,63 +116,98 @@ class ThomasWhittleEstimator(BaseWhittleEstimator):
         """
         return rho * K * (1 + K * np.exp(-4 * np.pi**2 * (p ** 2 + q ** 2) * (sigma ** 2)))
 
-    # def gradient(self, rho, K, sigma):
-    #     """
-    #     The gradient of the Whittle likelihood.
-    #     """
-    #     # Empty array to store the derivative terms prior to sum
-    #     grad_rho = np.zeros((len(self.fourier_frequencies) ** 2))
-    #     grad_K = np.zeros((len(self.fourier_frequencies) ** 2))
-    #     grad_sig = np.zeros((len(self.fourier_frequencies) ** 2))
+class LGCPWhittleEstimator(BaseWhittleEstimator):
+    """
+    A class to compute an estimator based on the Whittle likelihood.
+    Parameters:
+        - spp: the spatial point process (np.array).
+        - freq_min, freq_max, freq_step: integers defining range and 
+                step size of the frequencies to evaluate at.
+        - minX, maxX, ...: grid we simulate on.
+        - taper: normalised taper function. If not supplied, the default is to 
+             leave as None and a taper leading to the standard Periodogram
+             is computed.
+        - taper_ft: Fourier transform of the taper. Default as above.
+    """
+    def __init__(self, spp, freq_min, freq_max, freq_step,
+                 minX, maxX, minY, maxY, taper=None, taper_ft=None):
+        super().__init__(spp, freq_min, freq_max, freq_step,minX, maxX, 
+                         minY, maxY, taper, taper_ft)
+        
+        # Override the Fourier frequencies and establish based on value of beta
+        self.fourier_frequencies = self.freq_set * 2 * np.pi
+        
+    def computeSpectralDensity(self, mu, sig2, beta, k_max, p, q):
+        """
+        Function to compute the spectral density estimate for a LGCP
+        with an exponential kernel
+        """
+        omega = (p ** 2 + q ** 2) ** (1/2)
 
-    #     i = -1
-    #     for p in self.fourier_frequencies:
-    #         for q in self.fourier_frequencies:
-    #             i += 1
-    #             # Compute omega
-    #             omega = np.sqrt(p ** 2 + q ** 2)
-    #             # Compute f(omega; theta)
-    #             spectral_density = self.computeSpectralDensity(
-    #                 rho=rho, K=K, sigma=sigma, p=p, q=q)
-    #             # Compute I(omega)
-    #             periodogram = self.computePeriodogram(p=p, q=q)
-    #             # Compute pdv terms
-    #             exp_term = -(K * omega) ** 2
-    #             pdv_f_rho = K + (K **2) * np.exp(exp_term)
-    #             pdv_f_K = rho + 2 * rho * K * np.exp(exp_term)
-    #             pdv_f_sig = -2 * rho * sigma * ((K * omega) ** 2) * np.exp(exp_term)
-    #             # Populate the gradient terms
-    #             outside_factor = (periodogram/(spectral_density ** 2) - 1/spectral_density)
-    #             grad_rho[i] = outside_factor * pdv_f_rho
-    #             grad_K[i] = outside_factor * pdv_f_K
-    #             grad_sig[i] =  outside_factor * pdv_f_sig
+        if omega * beta < 1 / np.pi:
+            kappa = np.pi * omega * beta
+            f_trunc = (np.exp(mu + sig2/2) +
+                2 * np.pi * np.exp(2 * mu + sig2) * (sig2 ** 2) * (beta ** 2) *
+                self._full_sum_to_k(k_max, kappa, sig2)
+            )
+        else:
+            f_trunc = np.nan
 
-    #     return np.array([np.sum(grad_rho), np.sum(grad_K), np.sum(grad_sig)])
+        return f_trunc
 
+    def _outer_sum_terms(self, k, kappa):
+        """
+        Helper function for computeSpectralDensity
+        """
+    
+        @np.vectorize
+        def terms_to_k(k_set):
+            return (
+                ((-1) ** k_set * math.factorial(2*k_set + 1)) / 
+                (2**(2*k_set) * (math.factorial(k_set))**2) * 
+                kappa ** (2 * k_set)
+            )
 
-    # def gradientAscent(self, init_params, learn_rate=0.1, n_iter=50, tolerance=1e-02):
-    #     """
-    #     Gradient ascent algorithm for maximising the Whittle lieklihood.
-    #     """
-    #     # Initializing the values of the variables
-    #     param_vector = np.array(init_params)
+        k_set = np.arange(k + 1)
 
-    #     # Setting up and checking the learning rate
-    #     learn_rate = np.array(learn_rate)
+        return terms_to_k(k_set)
+        
+    def _gen_hyper_terms(self, k, sig2):
+        """
+        Helper function for computeSpectralDensity
+        """
+        
+        k_set = np.arange(k+1)
 
-    #     # Performing the gradient descent loop
-    #     for _ in range(n_iter):
-    #         # Recalculating the difference
-    #         diff = learn_rate * np.array(self.gradient(param_vector[0],
-    #                                                    param_vector[1],
-    #                                                    param_vector[2]))
+        gen_hyper_store = np.zeros(k+1)
 
-    #         # Checking if the absolute difference is small enough
-    #         if np.all(np.abs(diff) <= tolerance):
-    #             break
+        for i in k_set:
+            a = np.full(2*i + 3, 1); b = np.full(2*i + 3, 2)
+            gen_hyper_store[i] = (
+                mp.hyper(a, b, sig2)
+            )
 
-    #         # Updating the values of the variables
-    #         param_vector += diff
+        return gen_hyper_store 
 
-    #     return param_vector if param_vector.shape else param_vector.item()
+    def _full_sum_to_k(self, k, kappa, sig2):
+        """
+        Helper function for computeSpectralDensity
+        """
 
+        full_sum = (
+            np.cumsum(self._outer_sum_terms(k, kappa) 
+                        * self._gen_hyper_terms(k, sig2))
+        )
+
+        return full_sum
+    
+#%%
+from spatial_pp import SPP_LGCP
+from gstools import Exponential
+
+lgcp = SPP_LGCP(step_size=0.01)
+spp = lgcp.simSPP(Exponential, {'dim': 2, 'var': 0.1, 'len_scale': 0.1}, mean=5)
+lgcp_w = LGCPWhittleEstimator(spp, minX=-0.5, maxX=0.5, 
+                              minY=-0.5, maxY=0.5)
+
+lgcp_w.computeLikelihood(mu=4, sig2=0.15, beta=0.2, k_max=250)
