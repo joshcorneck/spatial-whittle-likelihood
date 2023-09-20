@@ -1,6 +1,6 @@
 import numpy as np
 
-from spatial_pp import SPP_Thomas
+from simulation_methods.spatial_pp import SPP_Thomas
 
 class PalmLikelihoodThomas:
     """

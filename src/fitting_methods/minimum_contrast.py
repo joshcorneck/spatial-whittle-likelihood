@@ -1,4 +1,3 @@
-#%%
 from astropy.stats import RipleysKEstimator
 import numpy as np
 from scipy.integrate import trapezoid
@@ -113,36 +112,3 @@ class MinimumContrastThomas:
         K_min = self.N / rho_min
 
         return np.array([rho_min, K_min, sigma_min])
-
-#%%
-
-# import matplotlib.pyplot as plt
-
-# spp_t = SPP_Thomas()
-# mct = MinimumContrastThomas(spp_t, rho=50, K=15, sigma=0.03, 
-#                             cov = np.array([[1,0], [0, 1]]), enlarge=1.25)
-# # samp_params = mct.scipyOptimisation(init_params=[15, 0.05])
-# samp_params = mct.minimumContrastEstimate(rho_grid=np.linspace(10,100,100),
-#                                           sigma_grid=np.linspace(0.01,0.1,100))
-# samp_params
-#%%
-
-# plt.figure(1);
-# plt.scatter(np.log(params[:,0]), np.log(params[:,1]));
-# plt.xlabel(r"$\log(\hat{\rho})$"); plt.ylabel(r"$\log(\hat{\sigma})$");
-
-# data = [(params[:,0]- 25)/25, (params[:,1]- 0.03)/0.03]
-# fig7, ax7 = plt.subplots()
-# ax7.set_title('Normalised differnece between parameter estimates and true values')
-# ax7.boxplot(data)
-# plt.xticks([1, 2], [r'$(\hat{\rho} - \rho)/\rho$', r'$(\hat{\sigma} - \sigma)/\sigma$'])
-# plt.show()
-
-# plt.figure(2);
-# plt.boxplot((params[:,0]- 25)/25);
-# plt.xticks([1], ['']); plt.title(r"Plot of $(\hat{\rho} - \rho)/\rho$")
-# plt.figure(3);
-# plt.boxplot((params[:,1]- 0.03)/0.03);
-# plt.xticks([1], ['']); plt.title(r"Plot of $(\hat{\sigma} - \sigma)/\sigma$")
-
-# %%

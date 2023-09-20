@@ -1,3 +1,4 @@
+#%%
 """
 This document contains classes for sampling from different point processes.
 Point processes that can be simulated are:
@@ -13,7 +14,7 @@ from gstools import SRF, Exponential
 
 import matplotlib.pyplot as plt
 
-from abc import ABC, abstractmethod, abstractstaticmethod
+from abc import ABC, abstractmethod
 
 class SPP(ABC):
     """
@@ -23,7 +24,8 @@ class SPP(ABC):
     def simSPP(self) -> np.array:
         pass
 
-    @abstractstaticmethod
+    @staticmethod
+    @abstractmethod
     def plot():
         pass
 
@@ -85,8 +87,6 @@ class SPP_HomPoisson(SPP):
             if file_name == None:
                 raise ValueError("Please give a file name.")
             plt.savefig(file_name)
-
-
 
 class SPP_InhomPoisson(SPP_HomPoisson):
     """
@@ -259,7 +259,8 @@ class SPP_LGCP(SPP):
         self._sim_GRF(kernel, kernel_params, mean)
 
         # Create the lattice to simulate the points on
-        x = y = np.arange(self.minX + self.step_size/2, self.maxX, self.step_size)
+        x = np.arange(self.minX + self.step_size/2, self.maxX, self.step_size)
+        y = np.arange(self.minY + self.step_size/2, self.maxY, self.step_size)
 
         # List to store the cell_PPs
         full_PP = []
@@ -273,11 +274,13 @@ class SPP_LGCP(SPP):
                 if N_cell != 0:
                     # Uniformly distribute the points on the window
                     xHom = np.random.uniform(x_lat - self.step_size/2,
-                                    x_lat + self.step_size/2, N_cell) 
+                                             x_lat + self.step_size/2, 
+                                             N_cell) 
                     yHom = np.random.uniform(y_lat - self.step_size/2,
-                                    y_lat + self.step_size/2, N_cell) 
+                                             y_lat + self.step_size/2, 
+                                             N_cell) 
 
-                    cell_PP = np.array([xHom, yHom]).reshape((len(xHom), 2))
+                    cell_PP = np.array([xHom, yHom]).T
                     full_PP += [cell_PP]
 
         
@@ -290,8 +293,8 @@ class SPP_LGCP(SPP):
         A method to plot the GRF with the sampled point pattern overlayed.
         """
         # Define a grid for the field
-        x = np.linspace(0, self.maxX, 100) 
-        y = np.linspace(0, self.maxY, 100)
+        x = np.linspace(self.minX, self.maxX, int(self.lenX / self.step_size)) 
+        y = np.linspace(self.minY, self.maxY, int(self.lenX / self.step_size))
         X, Y = np.meshgrid(x, y)
 
         # Reshape the field for plotting

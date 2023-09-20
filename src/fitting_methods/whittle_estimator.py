@@ -1,16 +1,10 @@
-#%%
+from abc import ABC, abstractmethod
 import numpy as np
-import scipy, time
-from scipy.optimize import minimize
-from abc import ABC, abstractmethod, abstractstaticmethod
-from typing import List, Union
-import mpmath as mp
+from scipy.optimize import minimize, LinearConstraint
 import math
+import mpmath as mp
 
-from spatial_pp import SPP_Thomas
-from periodogram import Periodogram
-
-class BaseWhittleEstimator(Periodogram, ABC):
+class BaseWhittleEstimator(ABC):
     """
     A base class to compute an estimator based on the Whittle likelihood.
     Parameters:
@@ -23,13 +17,16 @@ class BaseWhittleEstimator(Periodogram, ABC):
              is computed.
         - taper_ft: Fourier transform of the taper. Default as above.
     """
-    def __init__(self, spp, freq_min, freq_max, freq_step,
-                 minX, maxX, minY, maxY, taper=None, 
-                 taper_ft=None):
-        super().__init__(freq_min, freq_max, freq_step, minX, maxX, 
-                         minY, maxY, taper, taper_ft)
-        self.spp = spp
-        self.N = len(spp)
+    def __init__(self, spp, freq_min, freq_max, freq_step, minX, maxX, minY, maxY):
+
+        self.spp = spp; self.N = len(spp)
+        self.minX = minX; self.maxX = maxX; self.minY = minY;  self.maxY = maxY
+        self.ell_x = maxX - minX; self.ell_y = maxY - minY
+        self.area = self.ell_x * self.ell_y
+        self.freq_min = freq_min; self.freq_max = freq_max
+
+        # Define the set of frequencies where we want to evaluate the periodogram
+        self.freq_set = np.arange(freq_min, freq_max + freq_step, freq_step)
 
         # Define the set of Fourier frequencies
         self.fourier_frequencies = self.freq_set * 2 * np.pi
@@ -41,20 +38,20 @@ class BaseWhittleEstimator(Periodogram, ABC):
         """
         pass
 
-    def computePeriodogram(self):
-        """
-        Function to compute the periodogram.
-        """
-        self.computeSinglePeriodogram(self.spp)
-
-    def computeLikelihood(self, **kwargs):
+    def computeLikelihood(self, periodogram, omega_skip=None, **kwargs):
         """
         Compute and return the Whittle likelihood. Parameters:
+            - periodogram: np.array of the periodogram.
+            - omega_skip: values of omega to avoid in the inference. This
+                          should be a np.array of shape (K,2), with K
+                          being the number of frequencies we need to skip.
             - **kwargs: must contain parameters of the spp at which
                         we want to evaluate the likelihood.      
         """
-        # Compute the full periodogram
-        self.computePeriodogram()
+        # Check likelihood shape matches inputted frequency range
+        if periodogram.shape != (len(self.freq_set), len(self.freq_set)):
+            raise ValueError("""Shape of inputted periodogram doesn't match the
+                             given frequency range.""")
 
         # Empty array to store the Whittle likelihood values
         likelihood_eval = np.zeros((len(self.fourier_frequencies) ** 2))
@@ -65,17 +62,25 @@ class BaseWhittleEstimator(Periodogram, ABC):
             j = -1
             for q in self.freq_set:
                 j += 1; k += 1
-                spectral_density = self.computeSpectralDensity(
-                    p=p, q=q, **kwargs)
-                periodogram_eval = self.periodogram[i, j]
-                likelihood_eval[k] = (np.log(spectral_density) + 
-                                periodogram_eval / spectral_density)
+                # Experimentation shows problems approx within circle or radius 1
+                # of the removeable pole. Check if p and q fall in this circle. If
+                # they do, keep likelihood at problematic values 0.
+                valid_freq = True
+                if omega_skip is not None:
+                    for centre in omega_skip:
+                        if ((p - centre[0]) ** 2 + (q - centre[1]) ** 2 < 1):
+                            valid_freq = False
+                if valid_freq:   
+                    spectral_density = self.computeSpectralDensity(p=p, q=q, **kwargs)
+                    periodogram_eval = periodogram[j, i]
+                    likelihood_eval[k] = -(np.log(spectral_density) + 
+                                    periodogram_eval / spectral_density)
 
-        return (-np.sum(likelihood_eval))
+        return np.sum(likelihood_eval)
 
-    def scipyOptimisation(
-        self, neg_ll, init_params, method='nelder-mead', 
-        options={'xatol': 1e-4, 'disp': False}, **kwargs):
+    def scipyOptimisation(self, neg_ll, init_params, constrained=False,
+                          method='nelder-mead', 
+                          options={'xatol': 1e-4, 'disp': False}, **kwargs):
         """
         Run the scipy.minimise algorithm with chosen method and options.
         Parameters:
@@ -86,10 +91,22 @@ class BaseWhittleEstimator(Periodogram, ABC):
         - init_params: vector containing the values at which we initialise
                        the scipy optimiser.
         """
-        solution = minimize(neg_ll, init_params, method=method,
+        # Constraints on positivity
+        constraint1 = LinearConstraint([1,0,0], 0, np.inf)
+        constraint2 = LinearConstraint([0,1,0], 0, np.inf)
+        constraint3 = LinearConstraint([0,0,1], 0, np.inf)
+        constraints = [constraint1, constraint2, constraint3]
+
+        if constrained:
+            solution = minimize(neg_ll, init_params, method=method,
+                    options=options, constraints=constraints, 
+                    **kwargs);
+        else:
+            solution = minimize(neg_ll, init_params, method=method,
                     options=options, **kwargs);
 
         return solution.x
+
 
 class ThomasWhittleEstimator(BaseWhittleEstimator):
     """
@@ -105,9 +122,9 @@ class ThomasWhittleEstimator(BaseWhittleEstimator):
         - taper_ft: Fourier transform of the taper. Default as above.
     """
     def __init__(self, spp, freq_min, freq_max, freq_step,
-                 minX, maxX, minY, maxY, taper=None, taper_ft=None):
+                 minX, maxX, minY, maxY):
         super().__init__(spp, freq_min, freq_max, freq_step,minX, maxX, 
-                         minY, maxY, taper, taper_ft)
+                         minY, maxY)
 
     def computeSpectralDensity(self, rho, K, sigma, p, q):
         """
@@ -115,6 +132,7 @@ class ThomasWhittleEstimator(BaseWhittleEstimator):
         process.
         """
         return rho * K * (1 + K * np.exp(-4 * np.pi**2 * (p ** 2 + q ** 2) * (sigma ** 2)))
+
 
 class LGCPWhittleEstimator(BaseWhittleEstimator):
     """
@@ -200,14 +218,3 @@ class LGCPWhittleEstimator(BaseWhittleEstimator):
         )
 
         return full_sum
-    
-#%%
-from spatial_pp import SPP_LGCP
-from gstools import Exponential
-
-lgcp = SPP_LGCP(step_size=0.01)
-spp = lgcp.simSPP(Exponential, {'dim': 2, 'var': 0.1, 'len_scale': 0.1}, mean=5)
-lgcp_w = LGCPWhittleEstimator(spp, minX=-0.5, maxX=0.5, 
-                              minY=-0.5, maxY=0.5)
-
-lgcp_w.computeLikelihood(mu=4, sig2=0.15, beta=0.2, k_max=250)
