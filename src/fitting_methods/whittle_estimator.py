@@ -17,9 +17,10 @@ class BaseWhittleEstimator(ABC):
              is computed.
         - taper_ft: Fourier transform of the taper. Default as above.
     """
-    def __init__(self, spp, freq_min, freq_max, freq_step, minX, maxX, minY, maxY):
+    def __init__(self, spp, periodogram, freq_min, freq_max, freq_step, 
+                 minX, maxX, minY, maxY):
 
-        self.spp = spp; self.N = len(spp)
+        self.spp = spp; self.N = len(spp); self.periodogram = periodogram
         self.minX = minX; self.maxX = maxX; self.minY = minY;  self.maxY = maxY
         self.ell_x = maxX - minX; self.ell_y = maxY - minY
         self.area = self.ell_x * self.ell_y
@@ -38,7 +39,7 @@ class BaseWhittleEstimator(ABC):
         """
         pass
 
-    def computeLikelihood(self, periodogram, omega_skip=None, **kwargs):
+    def computeLikelihood(self, omega_skip=None, **kwargs):
         """
         Compute and return the Whittle likelihood. Parameters:
             - periodogram: np.array of the periodogram.
@@ -49,7 +50,7 @@ class BaseWhittleEstimator(ABC):
                         we want to evaluate the likelihood.      
         """
         # Check likelihood shape matches inputted frequency range
-        if periodogram.shape != (len(self.freq_set), len(self.freq_set)):
+        if self.periodogram.shape != (len(self.freq_set), len(self.freq_set)):
             raise ValueError("""Shape of inputted periodogram doesn't match the
                              given frequency range.""")
 
@@ -66,21 +67,17 @@ class BaseWhittleEstimator(ABC):
                 # of the removeable pole. Check if p and q fall in this circle. If
                 # they do, keep likelihood at problematic values 0.
                 valid_freq = True
-                if omega_skip is not None:
-                    for centre in omega_skip:
-                        if ((p - centre[0]) ** 2 + (q - centre[1]) ** 2 < 1):
-                            valid_freq = False
+                if ((p == 0) & (q == 0)):
+                    valid_freq = False
                 if valid_freq:   
                     spectral_density = self.computeSpectralDensity(p=p, q=q, **kwargs)
-                    periodogram_eval = periodogram[j, i]
+                    periodogram_eval = self.periodogram[j, i]
                     likelihood_eval[k] = -(np.log(spectral_density) + 
                                     periodogram_eval / spectral_density)
 
         return np.sum(likelihood_eval)
 
-    def scipyOptimisation(self, neg_ll, init_params, constrained=False,
-                          method='nelder-mead', 
-                          options={'xatol': 1e-4, 'disp': False}, **kwargs):
+    def scipyOptimisation(self, neg_ll, init_params, method=None, **kwargs):
         """
         Run the scipy.minimise algorithm with chosen method and options.
         Parameters:
@@ -91,19 +88,10 @@ class BaseWhittleEstimator(ABC):
         - init_params: vector containing the values at which we initialise
                        the scipy optimiser.
         """
-        # Constraints on positivity
-        constraint1 = LinearConstraint([1,0,0], 0, np.inf)
-        constraint2 = LinearConstraint([0,1,0], 0, np.inf)
-        constraint3 = LinearConstraint([0,0,1], 0, np.inf)
-        constraints = [constraint1, constraint2, constraint3]
-
-        if constrained:
-            solution = minimize(neg_ll, init_params, method=method,
-                    options=options, constraints=constraints, 
-                    **kwargs);
+        if method is None:
+            solution = minimize(neg_ll, init_params, **kwargs);
         else:
-            solution = minimize(neg_ll, init_params, method=method,
-                    options=options, **kwargs);
+            solution = minimize(neg_ll, init_params, method=method, **kwargs);
 
         return solution.x
 
@@ -121,17 +109,57 @@ class ThomasWhittleEstimator(BaseWhittleEstimator):
              is computed.
         - taper_ft: Fourier transform of the taper. Default as above.
     """
-    def __init__(self, spp, freq_min, freq_max, freq_step,
+    def __init__(self, spp, periodogram, freq_min, freq_max, freq_step,
                  minX, maxX, minY, maxY):
-        super().__init__(spp, freq_min, freq_max, freq_step,minX, maxX, 
+        super().__init__(spp, periodogram, freq_min, freq_max, freq_step,minX, maxX, 
                          minY, maxY)
 
-    def computeSpectralDensity(self, rho, K, sigma, p, q):
+    def computeSpectralDensity(self, lam_hat, rho_tilde, sig_tilde, p, q):
         """
         Function to compute the spectral density estimate for a Thomas
-        process.
+        process. Note that this is now parameterised entirely in terms of 
+        the transformed variables.
         """
-        return rho * K * (1 + K * np.exp(-4 * np.pi**2 * (p ** 2 + q ** 2) * (sigma ** 2)))
+        return lam_hat * (1 + lam_hat * np.exp(-(4 * np.pi ** 2 * (p ** 2 + q ** 2) *
+                                                 np.exp(2 * sig_tilde) + rho_tilde)))
+    
+    def computeLikelihoodDerivative(self, lam_hat, rho_tilde, sig_tilde):
+        """
+        This will compute the full likelihood derivative. This will be parameterised in
+        terms of the transformed variables, and is the derivative with respect to 
+        those variables.
+        """
+        # Empty array to store the derivative frequency evaluations
+        deriv_eval = np.zeros((2, len(self.fourier_frequencies) ** 2))
+
+        i = -1; k=-1
+        for p in self.freq_set:
+            i += 1
+            j = -1
+            for q in self.freq_set:
+                j += 1; k += 1
+                spec_density = self.computeSpectralDensity(lam_hat, rho_tilde, sig_tilde, p, q)
+                spec_deriv = self._spectralDerivative(lam_hat, rho_tilde, sig_tilde, p, q)
+                periodogram_eval = self.periodogram[j, i]
+                deriv_eval[:,k] = - spec_deriv / spec_density * (1 - periodogram_eval / spec_density)
+
+        gradients = deriv_eval.sum(axis=1)
+
+        return gradients
+
+    def _spectralDerivative(self, lam_hat, rho_tilde, sig_tilde, p, q):
+        """
+        The derivative of f(omega;theta_tilde) with respect to rho_tilde and sig_tilde. 
+        Note that this is parameterised in terms of the transformed variables.
+        """
+        der_rho_tilde = -(lam_hat ** 2 * np.exp(-4 * np.pi ** 2 * (p ** 2 + q ** 2) * 
+                                                  np.exp(2 * sig_tilde) - rho_tilde)
+        )
+        der_sig_tilde = -(8 * np.pi ** 2 * (p ** 2 + q ** 2) * lam_hat ** 2 *
+                          np.exp(2 * sig_tilde - rho_tilde - 4 * np.pi ** 2 * (p ** 2 + q ** 2) * 
+                                 np.exp(2 * sig_tilde)))
+        
+        return np.array([der_rho_tilde, der_sig_tilde])
 
 
 class LGCPWhittleEstimator(BaseWhittleEstimator):

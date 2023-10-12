@@ -311,3 +311,21 @@ class SPP_LGCP(SPP):
 
     def sample_and_plot(self):
         pass
+
+#%%
+mu = 5; var = 3; N_runs = 25
+lgcp = SPP_LGCP(step_size=0.01)
+num = np.zeros((N_runs,))
+for j in range(N_runs):
+    spp = lgcp.simSPP(Exponential, {'dim': 2, 'var': var, 'len_scale': 0.05}, mu)
+    num[j] = len(spp)
+print(f"Expected no. points: {np.exp(mu + var/2)}")
+print(f"Average no. points: {num.mean()}")
+#%%
+lam0 = 2
+mu = 0.1; var = 2*(np.log(lam0) - mu)
+lgcp = SPP_LGCP(minX=-10, maxX=10, minY=-10, maxY=10, step_size=0.2)
+spp = lgcp.simSPP(Exponential, {'dim': 2, 'var': var, 'len_scale': 0.1}, mu)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
+lgcp.plot()
+
+# %%
